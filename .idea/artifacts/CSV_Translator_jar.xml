@@ -1,0 +1,9 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="CSV_Translator:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/CSV_Translator_jar</output-path>
+    <root id="archive" name="CSV_Translator.jar">
+      <element id="module-output" name="CSV_Translator" />
+      <element id="extracted-dir" path="$USER_HOME$/Downloads/Spire.Xls-FE_5.1.0/lib/Spire.Xls.jar" path-in-jar="/" />
+    </root>
+  </artifact>
+</component>
