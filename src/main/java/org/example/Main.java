@@ -1,276 +1,142 @@
 package org.example;
+
 import com.spire.xls.*;
+
+import javax.swing.*;
+import javax.swing.filechooser.FileNameExtensionFilter;
+import javax.swing.table.AbstractTableModel;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableCellRenderer;
+import javax.swing.table.TableModel;
+import java.awt.*;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.dnd.DnDConstants;
 import java.awt.dnd.DropTarget;
 import java.awt.dnd.DropTargetDropEvent;
-import java.util.*;
-import java.awt.*;
-import javax.swing.*;
-import java.io.File;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import javax.swing.filechooser.FileNameExtensionFilter;
-import javax.swing.JProgressBar;
-import java.awt.Color;
+import java.io.File;
+import java.util.*;
 import java.util.List;
-import javax.swing.table.DefaultTableModel;
-import javax.swing.table.TableCellRenderer;
 
 import static java.lang.Thread.sleep;
 
-public class Main{
-    // 窗口所需组件
-    private static JFrame f;
-    private File cfile;
-    private volatile JProgressBar progressBar;
-    private static final int PROGRESS_MIN_VALUE = 0;
-    private static final int PROGRESS_MAX_VALUE = 100;
-    JButton but1;
-    JButton but2;
-    JButton but3;
-    JButton but4;
-
-    JTextField p1;
-    Checkbox cg1;
-    Checkbox cg2;
-    JLabel titleLabel;
-    JFileChooser fChooser;
-    private static final String EXTENSION_XLSX = ".xlsx";
-    private static final String EXTENSION_XLS = ".xls";
-    private int Begin = 0;// 0 准备 1 完成
-    // 文件表格所需参数
-    private String filepath;// 文件路径
-    List<String> fileListPath = new ArrayList<>();// 文件储存路径列表
-    List<String> fileListName = new ArrayList<>();// 文件名储存列表
-    private static int REFRESH = 0;// 判断是否转换过数据
+/**
+ * @Description: TODO
+ * @Author: wang.ruoyu
+ * @Date: 2022年07月21日 12:51
+ * @Version: V1.0
+ */
+public class Main {
+    static JButton but1;
     private static int MULTIPLE = 0;// 判断是否为多个文件
-    private  String multiFilePath;// 目标文件路径
-    File Path;
-    int j;
-    JTable table;
 
-    /**
-     *  绘制进度条到表格中
-     */
-    class ProgressCellRender extends JProgressBar implements TableCellRenderer {
+    static JButton but2;
+    static JFileChooser fChooser;
+    static JButton but3;
+    static JButton but4;
+    public static JFrame frame;
+    private static int REFRESH = 0;
+    static String multiFilePath = null;
+    static File toFile;
+
+    static int j = 0;
+
+    public static class FileRowModel{
+        public File file;
+        public int progress = 0;
+        public static int begin = 0;// 0 准备 1 完成
+        public FileRowModel(File file) {
+            this.file = file;
+        }
+        public int begin(){
+            return begin;
+        }
+        public void setBegin(int value){
+            begin = value;
+        }
+    }
+
+    public static class CustomTableModel extends AbstractTableModel {
+
+        public List<FileRowModel> rows = new ArrayList<>();
+        public static String[] columnNames = {"文件名", "大小", "进度"};
+
+        public void clear(){
+            for(int i = 0; i < rows.size(); i++){
+                rows.get(i).progress = 0;
+                rows.get(i).setBegin(0);
+            }
+            this.rows.clear();
+        }
+
+        public void addRow(File file){
+            rows.add(new FileRowModel(file));
+            fireTableDataChanged();
+        }
+
+        public void updateRow(FileRowModel fileRowModel){
+            int i = rows.indexOf(fileRowModel);
+            if(i >= 0){
+                fireTableCellUpdated(i, 2);
+            }
+        }
+
+        @Override
+        public int getRowCount() {
+            return rows.size();
+        }
+
+        @Override
+        public int getColumnCount() {
+            return 3;
+        }
+
+        @Override
+        public Object getValueAt(int rowIndex, int columnIndex) {
+            if(columnIndex == 0){
+                return rows.get(rowIndex).file.getName();
+            }else if(columnIndex == 1){
+                return rows.get(rowIndex).file.getAbsolutePath();
+            }else{
+                if(rows.get(rowIndex).begin() == 0){
+                    return rows.get(rowIndex).progress;
+                } else if (rows.get(rowIndex).begin() == 1) {
+                    rows.get(rowIndex).progress = 100;
+                    return rows.get(rowIndex).progress;
+                } else{
+                    return 0;
+                }
+            }
+        }
+
+        // 设置表头
+        public String getColumnName(int c) {
+            if(c == 0)
+                return "文件名";
+            else if(c == 1)
+                return "路径";
+            else
+                return "进度条";
+        }
+    }
+
+    public static class ProgressCellRender extends JProgressBar implements TableCellRenderer {
         @Override
         public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-//            progressBar.paintImmediately(progressBar.getBounds());
-            int progress = progressBar.getValue();
-            if(value instanceof Float){
-                progress = Math.round(((Float) value)*100f);
-            } else if(value instanceof Integer){
-                progress = (int)value;
+            int progress = 0;
+            if (value instanceof Float) {
+                progress = Math.round(((Float) value) * 100f);
+            } else if (value instanceof Integer) {
+                progress = (int) value;
             }
             setValue(progress);
             return this;
         }
     }
 
-    //    class ProgressRenderer extends DefaultTableCellRenderer {
-//
-//        private final JProgressBar b = new JProgressBar(0, 100);
-//
-//        public ProgressRenderer() {
-//            super();
-//            setOpaque(true);
-//            b.setBorder(BorderFactory.createEmptyBorder(1, 1, 1, 1));
-//        }
-//
-//        @Override
-//        public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-//            Integer i = (Integer) value;
-//            String text = "Completed";
-//            if (i < 0) {
-//                text = "Error";
-//            } else if (i < 100) {
-//                b.setValue(i);
-//                return b;
-//            }
-//            super.getTableCellRendererComponent(table, text, isSelected, hasFocus, row, column);
-//            return this;
-//        }
-//    }
-    String[][] datas = {};
-    String[] titles = {"文件名", "路径", "进度条"};
-    private DefaultTableModel model = new DefaultTableModel(datas, titles) {
-        private static final long serialVersionUID = 1L;
-
-        @Override
-        public Class<?> getColumnClass(int column) {
-            return getValueAt(0, column).getClass();
-        }
-
-        @Override
-        public boolean isCellEditable(int row, int col) {
-            return false;
-        }
-    };
-
-    /**
-     * GUI界面
-     */
-    public void frameWindow(){
-        f = new JFrame("表格转换工具");
-        f.setBounds(500, 300, 400, 600);
-
-        // 设置窗口最小纬度
-        Dimension dim = new Dimension(200,500);
-        f.setMinimumSize(dim);
-        // 创建菜单容器
-        MenuBar mb = new MenuBar();
-        f.setMenuBar(mb);
-
-        // 设置表格4行2列的面板
-        GridLayout gl = new GridLayout(5,5,5,3);
-        f.setLayout(gl);
-
-        // 设置标题
-        Panel pn0 = new Panel(new BorderLayout());
-        titleLabel = new JLabel(new ImageIcon("CSV.png"));
-        titleLabel.setBounds(300,100,10,100);
-        pn0.add(titleLabel);
-//        pn0.setBackground(new Color(67, 67, 68));
-        pn0.setLayout(new FlowLayout());
-        f.add(pn0);
-
-        // 单选框组件
-        Panel pn1 = new Panel();
-        CheckboxGroup cg = new CheckboxGroup();
-        pn1.setLayout(new FlowLayout());
-        cg1 = new Checkbox("xlsx",cg,true);
-        cg2 = new Checkbox("xls",cg,false);
-//        pn1.setBackground(new Color(67, 67, 68));
-        pn1.add(cg1);
-        pn1.add(cg2);
-        f.add(pn1);
-
-        // 创建表哥所在面板
-        Panel pn5 = new Panel(new BorderLayout());
-        p1 = new JTextField(0);
-        p1.setBounds(20,20,3,100);
-
-        model = new DefaultTableModel(datas, titles);
-
-        table = new JTable(model);
-        table.getColumn("进度条").setCellRenderer(new ProgressCellRender());
-        table.getColumnModel().getColumn(0).setMaxWidth(80);
-        table.getColumnModel().getColumn(
-                0).setMinWidth(60);
-        table.getColumnModel().getColumn(1).setMinWidth(80);
-        table.getColumnModel().getColumn(2).setMinWidth(80);
-//        pn5.setBackground(new Color(67, 67, 68));
-
-        table.paintImmediately(table.getBounds());
-        JScrollPane scroll = new JScrollPane(table,JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-        scroll.setBounds(0,0,200,400);
-        scroll.getViewport().setBackground(new Color(243,247,255));
-
-        pn5.add(p1);
-        pn5.add(table);
-        pn5.add(new JScrollPane(table));
-        table.setSize(400, 300);
-        f.add(pn5);
-
-        // 按钮1
-        Panel pn2 = new Panel();
-        but1 = new JButton("选择csv文件");
-        but1.setContentAreaFilled(false);
-        but1.setFont(new Font("隶书",Font.PLAIN,15));
-        pn2.setLayout(new FlowLayout());
-        pn2.add(but1);
-        f.add(pn2);
-
-        // 按钮2
-        Panel pn3 = new Panel();
-        but2 = new JButton("转换");
-        but3 = new JButton("清空");
-        but4 = new JButton("移除");
-        but2.setFont(new Font("隶书",Font.PLAIN,15));
-        but3.setFont(new Font("隶书",Font.PLAIN,15));
-        but4.setFont(new Font("隶书",Font.PLAIN,15));
-//        pn3.setBackground(new Color(67, 67, 68));
-        pn3.setLayout(new FlowLayout());
-        pn3.add(but2);
-        pn3.add(but3);
-        pn3.add(but4);
-        f.add(pn3);
-
-        // 进度条
-        progressBar = new JProgressBar();
-        progressBar.setMaximum(PROGRESS_MAX_VALUE);
-        progressBar.setMinimum(PROGRESS_MIN_VALUE);
-        progressBar.setForeground(new Color(46, 145, 228));
-        progressBar.setBackground(new Color(220, 220, 220));
-
-        // 拖动窗口
-        f.setDropTarget(new DropTarget(){
-            @Override
-            public synchronized void drop(DropTargetDropEvent evt) {
-                try{
-                    // 转换完成后再次添加文件时，更新文件列表
-                    refreshTable();
-                    evt.acceptDrop(DnDConstants.ACTION_COPY);
-                    List<File> droppedFiles = (List<File>)evt.getTransferable().getTransferData(DataFlavor.javaFileListFlavor);
-                    for (File files : droppedFiles) {
-                        filepath = files.getAbsolutePath();
-                    }
-                    if(filepath.endsWith(".csv")){
-                        duplicate(fileListPath,filepath);
-                        fileListPath.add(filepath);
-                        cfile = new File(filepath);
-                        fileListName.add(cfile.getName());
-                        titleLabel.setIcon(new ImageIcon("excel.png"));
-                        model.addRow(new Object[] { cfile.getName(), cfile.getAbsolutePath() });
-                    } else {
-                        initGUI("请导入CSV文件！");
-                    }
-                }catch (Exception e){
-                    initGUI("文件导入重复！");
-                }
-            }
-        });
-        f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        f.setVisible(true);
-    }
-
-    /**
-     * 避免重复
-     * @param lists
-     * @param Path
-     */
-    private static void duplicate(List<String> lists, String Path){
-        if(lists.contains(Path)){
-            lists.remove(lists.size());
-        }
-    }
-
-    /**
-     * 重置常数
-     */
-    private void initConstant(){
-        MULTIPLE = 0;
-        Begin = 0;
-        progressBar.setValue(PROGRESS_MIN_VALUE);
-    }
-
-    /**
-     * 更新GUI文件列表
-     */
-    private void refreshTable(){
-        if(REFRESH != 0){
-            progressBar.setValue(PROGRESS_MIN_VALUE);
-            model.getDataVector().clear();
-            fileListPath.clear();
-            fileListName.clear();
-            REFRESH = 0;
-        }
-    }
-
-    public void moveFile(String fileName){
+    public static void moveFile(String fileName){
         String fromPath = System.getProperty("user.dir");
-        System.out.println(fileName);
         fromPath = fromPath + '/' + fileName;
         File file = new File(fromPath);
         fChooser.setSelectedFile(new File(fileName));
@@ -278,60 +144,88 @@ public class Main{
             String toPath = multiFilePath;
             toPath = toPath + fileName;
             File toFile = new File(toPath);
-            System.out.println(fromPath+"\t"+toPath);
-            System.out.println(file.renameTo(toFile));
             file.renameTo(toFile);
         }
     }
 
-    /**
-     * 将文件移动到指定文件夹下
-     * @param fileName
-     * @param customCallback
-     * @throws InterruptedException
-     */
-    public void moveFile(String fileName, CustomCallback customCallback) throws InterruptedException {
+    public static void processing(int index, Workbook workbook, String fileName, String fixed){
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                Worksheet sheet = workbook.getWorksheets().get(0);
+                // 访问工作表中使用的范围
+                CellRange usedRange = sheet.getAllocatedRange();
+                // 当将范围内的数字保存为文本时，忽略错误
+                usedRange.setIgnoreErrorOptions(EnumSet.of(IgnoreErrorType.NumberAsText));
+                // 自适应行高、列宽
+                usedRange.autoFitColumns();
+                usedRange.autoFitRows();
+                workbook.loadFromFile(model.rows.get(index).file.getAbsolutePath(),",",1,1);
+                // 判断版本
+                if(fixed.equals(".xlsx")){
+                    workbook.saveToFile(fileName + fixed, ExcelVersion.Version2013);
+                }else{
+                    workbook.saveToFile(fileName + fixed, ExcelVersion.Version97to2003);
+                }
+                //TODO 疑问点：如何判断线程已执行完成
+                model.rows.get(index).setBegin(1);
+            }
+        }).start();
+    }
+
+    public static void moveFile(int index, String fileName, CustomCallback customCallback) throws InterruptedException {
         //  导入到同一个文件目录下
         // 转移文件所需参数
-        // 目标文件
-        File toFile;
         if(MULTIPLE == 0){
             String fromPath = System.getProperty("user.dir");
             fromPath = fromPath + '/' + fileName;
             File file = new File(fromPath);
+            String chooserPath = model.rows.get(index).file.getAbsolutePath();
+            chooserPath = chooserPath.replace(model.rows.get(index).file.getName(),"");
             // 用户调取地址
-            fChooser = new JFileChooser();
-            String chooserPath = cfile.getPath();
-            chooserPath = chooserPath.replace(cfile.getName(),"");
-            fChooser.setCurrentDirectory(new File(chooserPath));// 设置默认目录
+            fChooser = new JFileChooser(new File(chooserPath));
+            fChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+//            fChooser.setCurrentDirectory(new File(chooserPath));// 设置默认目录
             fChooser.setDialogTitle("另存为"); // 定义目录框标题
+//            File[] files = null;
+//            int n = 0;
+//            if(n == 1){
+//                fChooser.setCurrentDirectory(new File(chooserPath));
+//            }else{
+//                files = new File[model.rows.size()];
+//                for(int i = 0; i < model.rows.size();i++){
+//                    File f = model.rows.get(i).file;
+//                    files[n++] = f;
+//                }
+//                if(n == 0)
+//                    files = null;
+//                else if(n < model.rows.size()){
+//                    File[] temp = new File[n];
+//                    files = temp;
+//                }
+//            }
+//            fChooser.setSelectedFiles(files);
             fChooser.setSelectedFile(new File(fileName));
             // 是否点击保存按钮
-            j = fChooser.showSaveDialog(f);
+            j = fChooser.showDialog(frame,"另存");
             if(j == JFileChooser.APPROVE_OPTION) {
-                Path = fChooser.getSelectedFile();
+                File Path = fChooser.getSelectedFile();
                 String toPath = Path.getPath();
                 multiFilePath = toPath.replace(fileName, "");
                 toFile = new File(toPath);
-                Boolean b = file.renameTo(toFile);
-                System.out.println(b);
                 file.renameTo(toFile);
-                Thread t;
-                t = new Thread(new Runnable() {
+                new Thread(new Runnable() {
                     @Override
                     public void run() {
                         try {
-                            while(Begin != 0){
+                            while(model.rows.get(index).begin() != 0){
                                 sleep(1000);
-                                System.out.println("Waiting");
                             }
                         } catch (InterruptedException e) {
                             throw new RuntimeException(e);
                         }
                     }
-                });
-                t.start();
-                System.out.println("Running....");
+                }).start();
                 customCallback.ok();
             }
             MULTIPLE = 1;
@@ -353,99 +247,109 @@ public class Main{
         }
     }
 
-    /**
-     * 初始化GUI窗口
-     * @param descrip
-     */
-    public void initGUI(String descrip){
-        titleLabel.setIcon(new ImageIcon("CSV.png"));
-        progressBar.setValue(PROGRESS_MIN_VALUE);
-        JOptionPane.showMessageDialog(f, descrip);
-    }
+    private static boolean complete = false;
+    private static JTable table;
+    private static CustomTableModel model;
 
-    /**
-     * 转换文件
-     * @param workbook
-     * @param fixed
+    /**{
+     * 创建并显示GUI。出于线程安全的考虑，
+     * 这个方法在事件调用线程中调用。
      */
-    public void processing(Workbook workbook, String fileName, String fixed){
-        new Thread(new Runnable() {
+    public static void createAndShowGUI() {
+
+        // 创建及设置窗口
+        frame = new JFrame("文件转换器");
+        frame.setBounds(700,250,400,600);
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+        GridLayout gl = new GridLayout(5,5,5,3);
+        frame.setLayout(gl);
+
+        // 设置标题
+        Panel pn0 = new Panel(new BorderLayout());
+        JLabel titleLabel = new JLabel(new ImageIcon("CSV.png"));
+        titleLabel.setBounds(300,100,10,100);
+        pn0.add(titleLabel);
+        frame.add(pn0);
+
+        // 单选框组件
+        Panel pn1 = new Panel();
+        CheckboxGroup cg = new CheckboxGroup();
+//        pn1.setLayout(new FlowLayout());
+        Checkbox cg1 = new Checkbox("xlsx",cg,true);
+        Checkbox cg2 = new Checkbox("xls",cg,false);
+        pn1.add(cg1);
+        pn1.add(cg2);
+        frame.add(pn1);
+
+        Panel pn5 = new Panel(new BorderLayout());
+        Object[][] data = {};
+        Container pane = frame.getContentPane();
+        model = new CustomTableModel(); // new DefaultTableModel(data, columnNames);
+        table = new JTable(model);
+
+        table.getColumnModel().getColumn(2).setCellRenderer(new ProgressCellRender());
+        table.setSize(400, 300);
+        table.setFillsViewportHeight(true);
+        table.getColumnModel().getColumn(0).setMaxWidth(80);
+        table.getColumnModel().getColumn(
+                0).setMinWidth(60);
+        table.getColumnModel().getColumn(1).setMinWidth(80);
+        table.getColumnModel().getColumn(2).setMinWidth(80);
+        JScrollPane scrollPane = new JScrollPane(table);
+        scrollPane.setBounds(0,0,200,400);
+        pane.add(scrollPane);
+
+        // 按钮1
+        Panel pn2 = new Panel();
+        but1 = new JButton("选择csv文件");
+        but1.setContentAreaFilled(false);
+        but1.setFont(new Font("隶书",Font.PLAIN,15));
+        pn2.setLayout(new FlowLayout());
+        pn2.add(but1);
+        frame.add(pn2);
+
+        // 按钮2
+        Panel pn3 = new Panel();
+        but2 = new JButton("转换");
+        but3 = new JButton("清空");
+        but4 = new JButton("移除");
+        but2.setFont(new Font("隶书",Font.PLAIN,15));
+        but3.setFont(new Font("隶书",Font.PLAIN,15));
+        but4.setFont(new Font("隶书",Font.PLAIN,15));
+
+        pn3.setLayout(new FlowLayout());
+        pn3.add(but2);
+        pn3.add(but3);
+        pn3.add(but4);
+        frame.add(pn3);
+
+        frame.setDropTarget(new DropTarget(){
             @Override
-            public void run() {
-                Worksheet sheet = workbook.getWorksheets().get(0);
-                // 访问工作表中使用的范围
-                CellRange usedRange = sheet.getAllocatedRange();
-                // 当将范围内的数字保存为文本时，忽略错误
-                usedRange.setIgnoreErrorOptions(EnumSet.of(IgnoreErrorType.NumberAsText));
-                // 自适应行高、列宽
-                usedRange.autoFitColumns();
-                usedRange.autoFitRows();
-                workbook.loadFromFile(cfile.getPath(),",",1,1);
-                // 判断版本
-                if(fixed.equals(EXTENSION_XLSX)){
-                    workbook.saveToFile(fileName + fixed, ExcelVersion.Version2013);
-                }else{
-                    workbook.saveToFile(fileName + fixed, ExcelVersion.Version97to2003);
-                }
-                Begin = 1;
-                setValues(PROGRESS_MAX_VALUE);
-                table.updateUI();
-            }
-        }).start();
-    }
-
-    /**
-     * 避免进度条线程冲突
-     * @param val
-     */
-    private synchronized void setValues(int val){
-        if(progressBar.getValue() != PROGRESS_MAX_VALUE)
-            progressBar.setValue(val);
-    }
-
-    /**
-     * 进度条
-     * @return
-     */
-    public void processBar(){
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                int i = PROGRESS_MIN_VALUE;
-                while(i < 97){
-                    if(Begin == 1) {
-                        setValues(PROGRESS_MAX_VALUE);
-                        break;
-                    }else{
-                        try {
-                            setValues(i);
-                            if(i < 40){
-                                sleep(100);
-                                table.updateUI();
-                            }else if(i < 60){
-                                sleep(150);
-                                table.updateUI();
-                            }else if(i < 80){
-                                sleep(250);
-                                table.updateUI();
-                            }else {
-                                sleep(550);
-                                table.updateUI();
+            public synchronized void drop(DropTargetDropEvent evt) {
+                try{
+                    refreshTable();// 初始化表格
+                    evt.acceptDrop(DnDConstants.ACTION_COPY);
+                    List<File> droppedFiles = (List<File>)evt.getTransferable().getTransferData(DataFlavor.javaFileListFlavor);
+                    for (File file : droppedFiles) {
+                        if(duplicate(file.getAbsolutePath())){
+                            System.out.println(file.getAbsolutePath());
+                            if(file.getAbsolutePath().endsWith(".csv")){
+                                model.addRow(file);
+                            }else{
+                                JOptionPane.showMessageDialog(frame,"请导入CSV文件");
                             }
-                        } catch (InterruptedException ignored) {
-
+                        }else{
+                            JOptionPane.showMessageDialog(frame,"文件导入重复");
                         }
                     }
-                    i++;
+                }catch (Exception e){
+                    JOptionPane.showMessageDialog(frame,"请导入CSV文件");
                 }
             }
-        }).start();
-    }
+        });
 
-    public Main(){
-
-        // GUI界面
-        frameWindow();
+        frame.setVisible(true);
 
         // 监听选择文件按钮
         but1.addActionListener(new ActionListener() {
@@ -455,8 +359,8 @@ public class Main{
                 chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
                 chooser.setFileFilter(new FileNameExtensionFilter("csv(*.csv)", "csv"));
                 chooser.setMultiSelectionEnabled(true);
-                refreshTable();
-                int ret = chooser.showDialog(f, "选择");
+                refreshTable();// 初始化表格
+                int ret = chooser.showDialog(frame, "选择");
                 if (ret == JFileChooser.APPROVE_OPTION){
                     File[] files = chooser.getSelectedFiles();
                     if(files.length == 0){
@@ -464,45 +368,42 @@ public class Main{
                     }
                     try{
                         for(int i = 0; i < files.length; i++){
-                            cfile = files[i];
-                            duplicate(fileListPath,cfile.getPath());
-                            fileListPath.add(cfile.getPath());
-                            fileListName.add(cfile.getName());
-                            model.addRow(new Object[] { cfile.getName(), cfile.getAbsolutePath() });
+                            if(duplicate(files[i].getPath())){
+                                if(files[i].getAbsolutePath().endsWith(".csv")){
+                                    model.addRow(files[i]);
+                                }
+                            }
                         }
                     }catch (Exception e2){
-                        initGUI("导入文件重复！");
+                        JOptionPane.showMessageDialog(frame,"导入文件重复");
                     }
                 }
             }
         });
 
-        // 监听转换按钮
         but2.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 try{
-                    initConstant();
+                    MULTIPLE = 0;
                     // 判断文件是否为空
-                    if(fileListPath.isEmpty()){
+                    if(model.rows.isEmpty()){
                         throw new RuntimeException();
                     }
-                    for(int i = 0; i < fileListPath.size(); i++){
-                        cfile = new File(fileListPath.get(i));
-                        Begin = 0;
-                        setValues(PROGRESS_MIN_VALUE);
+                    for(int i = 0; i < model.getRowCount(); i++){
                         // 创建一个workbook
                         Workbook workbook = new Workbook();
                         // 从列表中依次提取单个文件名
-                        String fileName = fileListName.get(i).substring(0, cfile.getName().lastIndexOf("."));
+                        String fileName = model.rows.get(i).file.getName().substring(0, model.rows.get(i).file.getName().lastIndexOf("."));
+                        int finalI = i;
                         // 版本： 1表示xlsx 2表示xls
                         if(cg1.getState()){
-                            moveFile(fileName + ".xlsx", new CustomCallback() {
+                            moveFile(finalI,fileName + ".xlsx", new CustomCallback() {
                                 @Override
                                 public void ok() throws InterruptedException {
-                                    processing(workbook, fileName, EXTENSION_XLSX);
-                                    processBar();
-                                    setValues(PROGRESS_MIN_VALUE);
+                                    processing(finalI, workbook, fileName, ".xlsx");
+//                                    model.setValueAt(0, finalI,2);
+                                    doProgressWork(model.rows.get(finalI));
                                     REFRESH = 1;// 再度拖入文件后刷新文件表格
                                     sleep(100);// 等待计算完成
                                 }
@@ -511,12 +412,11 @@ public class Main{
                             // RenameTo速度可能比moveFile慢，导致先发生moveFile的情况
                             moveFile(fileName+".xlsx");
                         }else{
-                            moveFile(fileName + ".xls", new CustomCallback() {
+                            moveFile(finalI, fileName + ".xls", new CustomCallback() {
                                 @Override
                                 public void ok() throws InterruptedException {
-                                    processing(workbook, fileName, EXTENSION_XLS);
-                                    processBar();
-                                    setValues(PROGRESS_MIN_VALUE);
+                                    processing(finalI, workbook, fileName, ".xls");
+                                    doProgressWork(model.rows.get(finalI));
                                     REFRESH = 1;// 再度拖入文件后刷新文件表格
                                     sleep(100);// 等待计算完成
                                 }
@@ -528,7 +428,8 @@ public class Main{
                     }
 
                 } catch (Exception e1){
-                    initGUI("未导入文件！");
+                    e1.printStackTrace();
+                    JOptionPane.showMessageDialog(frame,"未导入文件");
                 }
             }
         });
@@ -537,46 +438,86 @@ public class Main{
         but3.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                cfile = null;
-                model.getDataVector().clear();
-                fileListPath.clear();
-                fileListName.clear();
-                initGUI("已清空");
+                model.clear();
+                REFRESH = 0;
+                table.updateUI();
+                JOptionPane.showMessageDialog(frame,"已清空");
             }
         });
+
         // 监听移除按钮
         but4.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 try{
                     int rows[] = table.getSelectedRows();
-                    int[] empty = {};
                     // 判断是否选中为空
-                    if(Arrays.toString(rows).equals(Arrays.toString(empty))){
-//                        System.out.println("ffff");
-                        throw new RuntimeException();
+                    int l = rows.length;
+                    for(int i = l-1; i >= 0; i--) {
+                        model.rows.remove(rows[i]);
+                        table.updateUI();
                     }
-                    for(int i = rows.length-1; i >= 0; i--) {
-                        fileListPath.remove(rows[i]);
-                        fileListName.remove(rows[i]);
-                        model.removeRow(rows[i]);
-//                        System.out.println(rows[i]);
-                    }
-//                    System.out.println(fileListPath);
-//                    System.out.println(fileListName);
                 }catch (Exception e1){
-                    JOptionPane.showMessageDialog(f,"未选中");
+                    JOptionPane.showMessageDialog(frame,"未选中");
                 }
             }
         });
+    }
 
+    private static boolean duplicate(String path){
+        for(int i = 0; i < model.rows.size();i++){
+            if(model.rows.get(i).file.getAbsolutePath().equals(path)){
+                JOptionPane.showMessageDialog(frame, "重复");
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static void doWork(){
+        try {
+            Thread.sleep(5_000);
+            complete = true;
+            new JDialog().setVisible(true);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void doProgressWork(FileRowModel fileRowModel){
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                int i = 0;
+                while(i < 97){
+                    try {
+                        Thread.sleep(new Random().nextInt(1000));
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                    i++;
+                    fileRowModel.progress = i;
+                    model.updateRow(fileRowModel);
+                }
+            }
+        }).start();
+    }
+
+    /**
+     * 更新GUI文件列表
+     */
+    private static void refreshTable(){
+        if(REFRESH != 0){
+            model.clear();
+            REFRESH = 0;
+        }
     }
 
     public static void main(String[] args) {
-        // TODO Auto-generated method stub
-        new Main();
+        javax.swing.SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                createAndShowGUI();
+            }
+        });
     }
-
 }
-
-
