@@ -1,13 +1,10 @@
 package org.example;
 
 import com.spire.xls.*;
-
 import javax.swing.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.AbstractTableModel;
-import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableCellRenderer;
-import javax.swing.table.TableModel;
 import java.awt.*;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.dnd.DnDConstants;
@@ -18,34 +15,30 @@ import java.awt.event.ActionListener;
 import java.io.File;
 import java.util.*;
 import java.util.List;
-
 import static java.lang.Thread.sleep;
 
-/**
- * @Description: TODO
- * @Author: wang.ruoyu
- * @Date: 2022年07月21日 12:51
- * @Version: V1.0
- */
 public class Main {
     static JButton but1;
-    private static int MULTIPLE = 0;// 判断是否为多个文件
-
     static JButton but2;
     static JFileChooser fChooser;
     static JButton but3;
     static JButton but4;
     public static JFrame frame;
-    private static int REFRESH = 0;
     static String multiFilePath = null;
-    static File toFile;
+    File toFile;
+    private static JTable table;
+    private static CustomTableModel model;
+    private static int REFRESH = 0;// 刷新表格面板
+    static int j = 0;// 判断是否点击保存按钮
+    private static int MULTIPLE = 0;// 判断是否为多个文件
 
-    static int j = 0;
-
+    /**
+     * 类：列表中每行的属性
+     */
     public static class FileRowModel{
         public File file;
-        public int progress = 0;
-        public static int begin = 0;// 0 准备 1 完成
+        public int progress = 0;// 初始化进度条
+        public int begin = 0;// 0 准备 1 完成
         public FileRowModel(File file) {
             this.file = file;
         }
@@ -57,41 +50,41 @@ public class Main {
         }
     }
 
+    /**
+     * 自定义列表模版
+     */
     public static class CustomTableModel extends AbstractTableModel {
 
         public List<FileRowModel> rows = new ArrayList<>();
-        public static String[] columnNames = {"文件名", "大小", "进度"};
 
+        // 初始化清空
         public void clear(){
-            for(int i = 0; i < rows.size(); i++){
-                rows.get(i).progress = 0;
-                rows.get(i).setBegin(0);
+            for (FileRowModel row : rows) {
+                row.progress = 0;
+                row.setBegin(0);
             }
             this.rows.clear();
         }
-
+        // 添加行
         public void addRow(File file){
             rows.add(new FileRowModel(file));
             fireTableDataChanged();
         }
-
+        // 更新每行进度条
         public void updateRow(FileRowModel fileRowModel){
             int i = rows.indexOf(fileRowModel);
             if(i >= 0){
                 fireTableCellUpdated(i, 2);
             }
         }
-
         @Override
         public int getRowCount() {
             return rows.size();
         }
-
         @Override
         public int getColumnCount() {
             return 3;
         }
-
         @Override
         public Object getValueAt(int rowIndex, int columnIndex) {
             if(columnIndex == 0){
@@ -102,6 +95,7 @@ public class Main {
                 if(rows.get(rowIndex).begin() == 0){
                     return rows.get(rowIndex).progress;
                 } else if (rows.get(rowIndex).begin() == 1) {
+                    System.out.print("begin=1,filename="+rows.get(rowIndex).file.getName());
                     rows.get(rowIndex).progress = 100;
                     return rows.get(rowIndex).progress;
                 } else{
@@ -109,7 +103,6 @@ public class Main {
                 }
             }
         }
-
         // 设置表头
         public String getColumnName(int c) {
             if(c == 0)
@@ -121,6 +114,9 @@ public class Main {
         }
     }
 
+    /**
+     * 渲染进度条
+     */
     public static class ProgressCellRender extends JProgressBar implements TableCellRenderer {
         @Override
         public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
@@ -135,6 +131,10 @@ public class Main {
         }
     }
 
+    /**
+     * 移动文件
+     * @param fileName
+     */
     public static void moveFile(String fileName){
         String fromPath = System.getProperty("user.dir");
         fromPath = fromPath + '/' + fileName;
@@ -142,12 +142,19 @@ public class Main {
         fChooser.setSelectedFile(new File(fileName));
         if(j == JFileChooser.APPROVE_OPTION){
             String toPath = multiFilePath;
-            toPath = toPath + fileName;
+            toPath = toPath +"/"+ fileName;
             File toFile = new File(toPath);
             file.renameTo(toFile);
         }
     }
 
+    /**
+     * 转换文件
+     * @param index
+     * @param workbook
+     * @param fileName
+     * @param fixed
+     */
     public static void processing(int index, Workbook workbook, String fileName, String fixed){
         new Thread(new Runnable() {
             @Override
@@ -168,12 +175,20 @@ public class Main {
                     workbook.saveToFile(fileName + fixed, ExcelVersion.Version97to2003);
                 }
                 //TODO 疑问点：如何判断线程已执行完成
+                System.out.println("current complete, i="+index+",time="+System.currentTimeMillis());
                 model.rows.get(index).setBegin(1);
             }
         }).start();
     }
 
-    public static void moveFile(int index, String fileName, CustomCallback customCallback) throws InterruptedException {
+    /**
+     * 移动文件
+     * @param index
+     * @param fileName
+     * @param customCallback
+     * @throws InterruptedException
+     */
+    public void moveFile(int index, String fileName, CustomCallback customCallback) throws InterruptedException {
         //  导入到同一个文件目录下
         // 转移文件所需参数
         if(MULTIPLE == 0){
@@ -183,35 +198,74 @@ public class Main {
             String chooserPath = model.rows.get(index).file.getAbsolutePath();
             chooserPath = chooserPath.replace(model.rows.get(index).file.getName(),"");
             // 用户调取地址
-            fChooser = new JFileChooser(new File(chooserPath));
+            fChooser = new JFileChooser();
             fChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-//            fChooser.setCurrentDirectory(new File(chooserPath));// 设置默认目录
-            fChooser.setDialogTitle("另存为"); // 定义目录框标题
-//            File[] files = null;
-//            int n = 0;
-//            if(n == 1){
-//                fChooser.setCurrentDirectory(new File(chooserPath));
-//            }else{
-//                files = new File[model.rows.size()];
-//                for(int i = 0; i < model.rows.size();i++){
-//                    File f = model.rows.get(i).file;
-//                    files[n++] = f;
-//                }
-//                if(n == 0)
-//                    files = null;
-//                else if(n < model.rows.size()){
-//                    File[] temp = new File[n];
-//                    files = temp;
-//                }
-//            }
-//            fChooser.setSelectedFiles(files);
+            fChooser.setCurrentDirectory(new java.io.File("."));
+            fChooser.setDialogTitle("另存为");
+            fChooser.setSelectedFile(null);
+            // 如果列表只有一个文件，则调用保存菜单
+            if(model.rows.size() == 1){
+                fChooser.setSelectedFile(new File(fileName));
+                int m = fChooser.showSaveDialog(frame);
+                if(m == JFileChooser.APPROVE_OPTION) {
+                    File Path = fChooser.getSelectedFile();
+                    System.out.println(Path.getAbsolutePath());
+                    String toPath = Path.getPath().replace("./","");
+                    toFile = new File(toPath);
+                    file.renameTo(toFile);
+                    new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                while(model.rows.get(index).begin() != 0){
+                                    sleep(1000);
+                                }
+                            } catch (InterruptedException e) {
+                                throw new RuntimeException(e);
+                            }
+                        }
+                    }).start();
+                    customCallback.ok();
+                }else{
+                    JOptionPane.showMessageDialog(frame,"ERROE");
+                }
+            }else{
+                // 是否点击保存按钮
+                j = fChooser.showOpenDialog(frame);
+                if(j == JFileChooser.APPROVE_OPTION) {
+                    File Path = fChooser.getSelectedFile();
+                    fChooser.setSelectedFile(new File(fileName));
+                    String toPath = Path.getPath().replace("/.","");
+                    toPath = toPath + "/"+fileName;
+                    multiFilePath = toPath.replace("/"+fileName, "");
+//                    System.out.println(multiFilePath);
+                    toFile = new File(toPath);
+                    file.renameTo(toFile);
+                    new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                while(model.rows.get(index).begin() != 0){
+                                    sleep(1000);
+                                }
+                            } catch (InterruptedException e) {
+                                throw new RuntimeException(e);
+                            }
+                        }
+                    }).start();
+                    customCallback.ok();
+                }
+                MULTIPLE = 1;
+            }
+        } else {
+            String fromPath = System.getProperty("user.dir");
+            System.out.println(fileName);
+            fromPath = fromPath + '/' + fileName;
+            File file = new File(fromPath);
             fChooser.setSelectedFile(new File(fileName));
-            // 是否点击保存按钮
-            j = fChooser.showDialog(frame,"另存");
-            if(j == JFileChooser.APPROVE_OPTION) {
-                File Path = fChooser.getSelectedFile();
-                String toPath = Path.getPath();
-                multiFilePath = toPath.replace(fileName, "");
+            if(j == JFileChooser.APPROVE_OPTION){
+                String toPath = multiFilePath;
+                toPath = toPath + "/" + fileName;
                 toFile = new File(toPath);
                 file.renameTo(toFile);
                 new Thread(new Runnable() {
@@ -228,34 +282,55 @@ public class Main {
                 }).start();
                 customCallback.ok();
             }
-            MULTIPLE = 1;
-        } else {
-            String fromPath = System.getProperty("user.dir");
-            System.out.println(fileName);
-            fromPath = fromPath + '/' + fileName;
-            File file = new File(fromPath);
-            fChooser.setSelectedFile(new File(fileName));
-            if(j == JFileChooser.APPROVE_OPTION){
-                String toPath = multiFilePath;
-                toPath = toPath + fileName;
-                toFile = new File(toPath);
-                System.out.println(fromPath+"\t"+toPath);
-                System.out.println(file.renameTo(toFile));
-                file.renameTo(toFile);
-                customCallback.ok();
+        }
+    }
+    private static boolean duplicate(String path){
+        for(int i = 0; i < model.rows.size();i++){
+            if(model.rows.get(i).file.getAbsolutePath().equals(path)){
+                JOptionPane.showMessageDialog(frame, "重复");
+                return false;
             }
+        }
+        return true;
+    }
+
+    private static void doProgressWork(FileRowModel fileRowModel){
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                int i = 0;
+                while(i < 97 && fileRowModel.begin == 0){
+                    try {
+                        Thread.sleep(new Random().nextInt(1000));
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                    i++;
+                    fileRowModel.progress = i;
+                    System.out.println("filename="+fileRowModel.file.getName()+",i="+i);
+                    model.updateRow(fileRowModel);
+                }
+            }
+        }).start();
+    }
+
+    /**
+     * 更新GUI文件列表
+     */
+    private static void refreshTable(){
+        if(REFRESH != 0){
+            model.clear();
+            REFRESH = 0;
         }
     }
 
-    private static boolean complete = false;
-    private static JTable table;
-    private static CustomTableModel model;
+
 
     /**{
      * 创建并显示GUI。出于线程安全的考虑，
      * 这个方法在事件调用线程中调用。
      */
-    public static void createAndShowGUI() {
+    public void createAndShowGUI() {
 
         // 创建及设置窗口
         frame = new JFrame("文件转换器");
@@ -464,60 +539,15 @@ public class Main {
         });
     }
 
-    private static boolean duplicate(String path){
-        for(int i = 0; i < model.rows.size();i++){
-            if(model.rows.get(i).file.getAbsolutePath().equals(path)){
-                JOptionPane.showMessageDialog(frame, "重复");
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private static void doWork(){
-        try {
-            Thread.sleep(5_000);
-            complete = true;
-            new JDialog().setVisible(true);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private static void doProgressWork(FileRowModel fileRowModel){
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                int i = 0;
-                while(i < 97){
-                    try {
-                        Thread.sleep(new Random().nextInt(1000));
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
-                    i++;
-                    fileRowModel.progress = i;
-                    model.updateRow(fileRowModel);
-                }
-            }
-        }).start();
-    }
-
-    /**
-     * 更新GUI文件列表
-     */
-    private static void refreshTable(){
-        if(REFRESH != 0){
-            model.clear();
-            REFRESH = 0;
-        }
-    }
-
-    public static void main(String[] args) {
+    public Main(){
         javax.swing.SwingUtilities.invokeLater(new Runnable() {
             public void run() {
                 createAndShowGUI();
             }
         });
+    }
+
+    public static void main(String[] args) {
+        new Main();
     }
 }
