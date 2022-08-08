@@ -140,23 +140,32 @@ public class Main {
      * @param fileName 文件名
      * @return 返回导出路径
      */
-    public String selectDir(int index, String fileName) {
+    public String selectDir(int index, String fileName, String extension) {
         if (MULTIPLE == 0) {
             String oldFileName = model.rows.get(index).file.getName();
             String fromPath = model.rows.get(index).file.getPath().replace(oldFileName,fileName);// 选择当前文件夹
             fChooser = new JFileChooser();
             fChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
             fChooser.setCurrentDirectory(new File(fromPath.replace(fileName,"")));
-            fChooser.setDialogTitle("另存为");
-            System.out.println(model.rows.size());
+            File f = new File(fileName);
+            fChooser.setSelectedFile(f);
+            fChooser.setFileFilter(new FileNameExtensionFilter(extension+" FILE",extension));
             // 仅有一个文件，显示保存文件菜单
             if (model.rows.size() == 1) {
-                File f = new File(fileName);
-                fChooser.setSelectedFile(f);
                 int m = fChooser.showSaveDialog(frame);
                 if (m == JFileChooser.APPROVE_OPTION) {
+                    if(!fChooser.getSelectedFile().getName().endsWith(extension)){
+                        JOptionPane.showMessageDialog(frame, "导出文件格式错误");
+                        return "";
+                    }
+                    if(!fChooser.getSelectedFile().getName().equals(fileName)){
+                        MULTIPLE = -1;
+                        return fChooser.getSelectedFile().getAbsolutePath();
+                    }
                     MULTIPLE = -1;
                     return fChooser.getSelectedFile().getAbsolutePath().replace("/"+fileName,"");
+                } else if(m == fChooser.ERROR_OPTION){
+                    JOptionPane.showMessageDialog(frame,"错误");
                 }
             } else {
                 j = fChooser.showOpenDialog(frame);
@@ -213,14 +222,17 @@ public class Main {
                 String fromPath = System.getProperty("user.dir");
                 fromPath = fromPath + '/' + fileName+fixed;
                 File file = new File(fromPath);
-
-                File d = new File(dest + '/' + fileName + extension);
+                File d;
+                if(dest.endsWith(extension)){
+                    d = new File(dest);
+                }else{
+                    d = new File(dest + '/' + fileName + extension);
+                }
                 if(file.renameTo(d)){
                     System.out.println("Translate Success");
                 }else{
                     System.out.println("False");
                 }
-
                 System.out.println("current complete, i="+index+",time="+System.currentTimeMillis());
                 model.rows.get(index).setBegin(1);
             }
@@ -292,8 +304,7 @@ public class Main {
 
         // 设置标题
         Panel pn0 = new Panel(new BorderLayout());
-        java.net.URL imageURL1 = Main.class.getResource("/image/CSV.png");
-        JLabel titleLabel = new JLabel(new ImageIcon(imageURL1));
+        JLabel titleLabel = new JLabel(new ImageIcon(getClass().getResource("/image/CSV.png")));
         titleLabel.setBounds(300,100,10,100);
         pn0.add(titleLabel);
         frame.add(pn0);
@@ -421,14 +432,14 @@ public class Main {
                         String fileName = model.rows.get(i).file.getName().substring(0, model.rows.get(i).file.getName().lastIndexOf("."));
                         // 版本： 1表示xlsx 2表示xls
                         if(cg1.getState()){
-                            String dest = selectDir(i, fileName+EXCEL_EXTENSION_XLSX);
+                            String dest = selectDir(i, fileName+EXCEL_EXTENSION_XLSX,EXCEL_EXTENSION_XLSX);
                             if(dest.length() != 0){
                                 processing(i, workbook, fileName, EXCEL_EXTENSION_XLSX, dest);
                                 doProgressWork(model.rows.get(i));
                                 REFRESH = 1;// 再度拖入文件后刷新文件表格
                             }
                         }else{
-                            String dest = selectDir(i, fileName+EXCEL_EXTENSION_XLSX);
+                            String dest = selectDir(i, fileName+EXCEL_EXTENSION_XLSX,EXCEL_EXTENSION_XLSX);
                             if(dest.length() != 0){
                                 processing(i, workbook, fileName, EXCEL_EXTENSION_XLS, dest);
                                 doProgressWork(model.rows.get(i));

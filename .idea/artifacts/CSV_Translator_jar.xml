@@ -3,11 +3,11 @@
     <output-path>$PROJECT_DIR$/out/artifacts/CSV_Translator_jar</output-path>
     <root id="archive" name="CSV_Translator.jar">
       <element id="directory" name="META-INF">
-        <element id="file-copy" path="$PROJECT_DIR$/out/artifacts/META-INF/MANIFEST.MF" />
+        <element id="file-copy" path="$PROJECT_DIR$/src/META-INF/MANIFEST.MF" />
       </element>
       <element id="module-output" name="CSV_Translator" />
-      <element id="extracted-dir" path="$USER_HOME$/Downloads/commons-io-2.11.0.jar" path-in-jar="/" />
       <element id="extracted-dir" path="$USER_HOME$/Downloads/Spire.Xls-FE_5.1.0/lib/Spire.Xls.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$USER_HOME$/Downloads/commons-io-2.11.0.jar" path-in-jar="/" />
     </root>
   </artifact>
 </component>
