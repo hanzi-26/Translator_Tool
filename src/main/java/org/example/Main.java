@@ -280,7 +280,12 @@ public class Main {
                 int i = 0;
                 while(i < 97 && fileRowModel.begin == 0){
                     try {
-                        Thread.sleep(new Random().nextInt(1000));
+                        if(i < 20)
+                            Thread.sleep(i*20L);
+                        else if(i < 40)
+                            Thread.sleep(i*10L);
+                        else
+                            Thread.sleep(i*6L);
                     } catch (InterruptedException e) {
                         throw new RuntimeException(e);
                     }
@@ -455,7 +460,7 @@ public class Main {
                                 REFRESH = 1;// 再度拖入文件后刷新文件表格
                             }
                         }else{
-                            String dest = selectDir(i, fileName+EXCEL_EXTENSION_XLSX,EXCEL_EXTENSION_XLSX);
+                            String dest = selectDir(i, fileName+EXCEL_EXTENSION_XLS,EXCEL_EXTENSION_XLS);
                             if(dest.length() != 0){
                                 processing(i, workbook, fileName, EXCEL_EXTENSION_XLS, dest);
                                 doProgressWork(model.rows.get(i));
