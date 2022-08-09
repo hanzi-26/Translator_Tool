@@ -14,8 +14,14 @@ import java.awt.dnd.DropTargetDropEvent;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.List;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.*;
+
 
 public class Main {
     static JButton but1;
@@ -145,35 +151,39 @@ public class Main {
             String oldFileName = model.rows.get(index).file.getName();
             String fromPath = model.rows.get(index).file.getPath().replace(oldFileName,fileName);// 选择当前文件夹
             fChooser = new JFileChooser();
-            fChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-            fChooser.setCurrentDirectory(new File(fromPath.replace(fileName,"")));
-            File f = new File(fileName);
-            fChooser.setSelectedFile(f);
             fChooser.setFileFilter(new FileNameExtensionFilter(extension+" FILE",extension));
             // 仅有一个文件，显示保存文件菜单
             if (model.rows.size() == 1) {
+                fChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+                fromPath = model.rows.get(index).file.getPath().replace(oldFileName,fileName);
+                fChooser.setCurrentDirectory(new File(fromPath));
+                File f = new File(fromPath);
+                fChooser.setSelectedFile(f);
                 int m = fChooser.showSaveDialog(frame);
                 if (m == JFileChooser.APPROVE_OPTION) {
-                    if(!fChooser.getSelectedFile().getName().endsWith(extension)){
-                        JOptionPane.showMessageDialog(frame, "导出文件格式错误");
-                        return "";
-                    }
-                    if(!fChooser.getSelectedFile().getName().equals(fileName)){
-                        MULTIPLE = -1;
-                        return fChooser.getSelectedFile().getAbsolutePath();
+                    File cover = new File(fChooser.getSelectedFile().getPath());
+                    cover.delete();
+                    if(fChooser.getSelectedFile().getName().contains(".")){
+                        if(!fChooser.getSelectedFile().getName().endsWith(extension)){
+                            JOptionPane.showMessageDialog(frame,"导出文件格式错误！");
+                            return "";
+                        }
                     }
                     MULTIPLE = -1;
-                    return fChooser.getSelectedFile().getAbsolutePath().replace("/"+fileName,"");
+                    return fChooser.getSelectedFile().getAbsolutePath();
                 } else if(m == fChooser.ERROR_OPTION){
                     JOptionPane.showMessageDialog(frame,"错误");
                 }
             } else {
+                fChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+                fChooser.setCurrentDirectory(new File(fromPath.replace(fileName,"")));
+                File f = new File(fileName);
+                fChooser.setSelectedFile(f);
                 j = fChooser.showOpenDialog(frame);
                 if(j == JFileChooser.APPROVE_OPTION) {
                     File Path = fChooser.getSelectedFile();
                     fChooser.setSelectedFile(new File(fileName));
                     String toPath = Path.getPath().replace("/.","");
-                    System.out.println(toPath);
                     MULTIPLE = 1;
                     multiFilePath = toPath;
                     return toPath;
@@ -200,6 +210,7 @@ public class Main {
         new Thread(new Runnable() {
             @Override
             public void run() {
+                model.rows.get(index).progress = 0;
                 Worksheet sheet = workbook.getWorksheets().get(0);
                 String extension;
                 // 访问工作表中使用的范围
@@ -221,17 +232,14 @@ public class Main {
                 // 移动文件
                 String fromPath = System.getProperty("user.dir");
                 fromPath = fromPath + '/' + fileName+fixed;
-                File file = new File(fromPath);
-                File d;
-                if(dest.endsWith(extension)){
-                    d = new File(dest);
-                }else{
-                    d = new File(dest + '/' + fileName + extension);
+                String newDest = dest;
+                if(!dest.endsWith(extension)){
+                    newDest += '/' +fileName+extension;
                 }
-                if(file.renameTo(d)){
-                    System.out.println("Translate Success");
-                }else{
-                    System.out.println("False");
+                try{
+                    Files.move(Paths.get(fromPath), Paths.get(newDest), StandardCopyOption.REPLACE_EXISTING);
+                }catch (Exception ex){
+
                 }
                 System.out.println("current complete, i="+index+",time="+System.currentTimeMillis());
                 model.rows.get(index).setBegin(1);
@@ -304,7 +312,8 @@ public class Main {
 
         // 设置标题
         Panel pn0 = new Panel(new BorderLayout());
-        JLabel titleLabel = new JLabel(new ImageIcon(getClass().getResource("/image/CSV.png")));
+        java.net.URL imgURL = getClass().getResource("/image/CSV.png");
+        JLabel titleLabel = new JLabel(new ImageIcon(imgURL));
         titleLabel.setBounds(300,100,10,100);
         pn0.add(titleLabel);
         frame.add(pn0);
@@ -415,7 +424,7 @@ public class Main {
             }
         });
 
-        // 选择文件按钮
+        // 转换文件按钮
         but2.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
