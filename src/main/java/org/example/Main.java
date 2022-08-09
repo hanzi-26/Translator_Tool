@@ -162,7 +162,14 @@ public class Main {
                 int m = fChooser.showSaveDialog(frame);
                 if (m == JFileChooser.APPROVE_OPTION) {
                     File cover = new File(fChooser.getSelectedFile().getPath());
-                    cover.delete();
+                    // 判断是否选择覆盖文件
+                    if(cover.exists()){
+                        if(JOptionPane.showConfirmDialog(frame,"文件名重复，是否选择覆盖？","警告！",JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION){
+                            cover.delete();
+                        }else{
+                            return "";
+                        }
+                    }
                     if(fChooser.getSelectedFile().getName().contains(".")){
                         if(!fChooser.getSelectedFile().getName().endsWith(extension)){
                             JOptionPane.showMessageDialog(frame,"导出文件格式错误！");
